@@ -8,6 +8,8 @@ from PIL import Image
 import scipy.io
 import dataloader
 
+DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+
 def load_splits(split=1):
     # Originally returns 1-based indices.
     # Now minus 1 to get 0-based indices.
@@ -19,6 +21,7 @@ def load_splits(split=1):
 
 def get_dataloaders(split=1):
     strain, stest, sval = load_splits(split)
+    batch_size = 8
 
     dataset = dataloader.FlowerDataset(transform = transforms.Compose(
         [
@@ -31,9 +34,9 @@ def get_dataloaders(split=1):
     test_dataset = Subset(dataset, stest)
     valid_dataset = Subset(dataset, sval)
     # print(len(train_dataset), len(test_dataset), len(valid_dataset))
-    train_dl = DataLoader(train_dataset, batch_size=32, shuffle=True)
-    valid_dl = DataLoader(valid_dataset, batch_size=32, shuffle=False)
-    test_dl = DataLoader(test_dataset, batch_size=32, shuffle=False)
+    train_dl = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    valid_dl = DataLoader(valid_dataset, batch_size=batch_size, shuffle=False)
+    test_dl = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
     
     return {"train": train_dl, "test": test_dl, "valid": valid_dl}
 
