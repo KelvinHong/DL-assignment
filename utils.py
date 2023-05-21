@@ -9,6 +9,9 @@ import scipy.io
 import dataloader
 
 DEVICE = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
+with open("./data/labels.txt", "r") as f:
+    LABELS = f.read().splitlines()
+
 
 def load_splits(split=1):
     # Originally returns 1-based indices.
@@ -73,6 +76,33 @@ class baseCAM(nn.Module):
         x = self.last_dense(x)
         return x
     
+def custom_save(model, path):
+    """Save CAM model but only with its trainable parameters, 
+    its feature extractor counterpart isn't saved.
+
+    Args:
+        model (torch.nn.Module): Trained model
+        path (str): Path to model, ends with .pth.
+    """
+    pruned_state_dict = {
+        key: item for key,item in model.state_dict().items() if not key.startswith("features.")
+    }
+    torch.save(pruned_state_dict, path)
+
+def partial_load_state_dict(model, path):
+    """Load a model where the state_dict from given path doesn't contains 
+    all keys from model's state_dict.
+
+    Args:
+        model (torch.nn.Module): An initialized model.
+        path (str): Where to load model from.
+    """
+    model_dict = model.state_dict()
+    pretrained_dict = {k: v for k, v in torch.load(path).items() if k in model_dict}
+    model_dict.update(pretrained_dict) 
+    model.load_state_dict(model_dict)
+    return model
+
 if __name__ == "__main__":
     # Create an instance of the VGG16FeaturesOnly model
     model = baseCAM()

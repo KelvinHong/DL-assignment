@@ -1,7 +1,8 @@
-from utils import load_splits, get_dataloaders
-
-s1, s2, s3 = load_splits(3)
-print(s1.shape)
-
-
-get_dataloaders(1)
+from inference import get_random_batch
+from dataloader import FlowerDataset
+d = FlowerDataset()
+batch, labels = get_random_batch(d, seed=1000)
+print(batch.shape)
+print(batch.min())
+print(batch.max())
+print(labels)

@@ -7,37 +7,6 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 
-class FlowerDataset(Dataset):
-    """Face Landmarks dataset."""
-
-    def __init__(self, data_root = "./data/jpg/", transform=None):
-        """
-        Arguments:
-            transform (callable, optional): Optional transform to be applied
-                on a sample.
-        """
-        self.data_root = data_root
-        self.transform = transform
-        self.data_len = len([path for path in os.listdir(data_root) if path.endswith(".jpg")])
-        self.image_paths = [f"image_{str(i+1).zfill(4)}.jpg" for i in range(self.data_len)]
-
-    def __len__(self):
-        return self.data_len
-
-    def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-
-        img_name = os.path.join(self.data_root, self.image_paths[idx])
-        image = io.imread(img_name)
-        image = np.float32(image)
-        label = np.floor(idx/80)
-
-        if self.transform:
-            image = self.transform(image)
-
-
-        return image, int(label)
     
 class Rescale(object):
     """Rescale the image in a sample to a given size.
@@ -72,11 +41,50 @@ class Rescale(object):
 class ToTensor(object):
     """Convert ndarrays in sample to Tensors."""
     def __call__(self, image):
-        return torch.from_numpy(image).permute((2,0,1))
+        return torch.from_numpy(image).permute((2,0,1))/255.
 
-if __name__ == "__main__":
-    fd = FlowerDataset(transform=transforms.Compose([
+
+class FlowerDataset(Dataset):
+    """Face Landmarks dataset."""
+
+    def __init__(self, data_root = "./data/jpg/", transform=None):
+        """
+        Arguments:
+            transform (callable, optional): Optional transform to be applied
+                on a sample.
+        """
+        self.data_root = data_root
+        if transform is None:
+            # Default transform
+            self.transform = transforms.Compose([
                                                 Rescale((256,256)),
                                                 ToTensor(),
-                                            ]))
+                                            ])
+        else:
+            self.transform = transform
+        self.data_len = len([path for path in os.listdir(data_root) if path.endswith(".jpg")])
+        self.image_paths = [f"image_{str(i+1).zfill(4)}.jpg" for i in range(self.data_len)]
+
+    def __len__(self):
+        return self.data_len
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        img_name = os.path.join(self.data_root, self.image_paths[idx])
+        image = io.imread(img_name)
+        image = np.float32(image)
+        label = np.floor(idx/80)
+
+        if self.transform:
+            image = self.transform(image)
+
+
+        return image, int(label)
+
+if __name__ == "__main__":
+    fd = FlowerDataset()
     image, label = fd[100]
+    print(image.shape)
+    print(image.max())

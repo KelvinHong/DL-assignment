@@ -1,6 +1,9 @@
 # Dataset and generated models
 data/*
+!data/labels.txt
 model/*
+# Tensorboard metrics
+runs/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
