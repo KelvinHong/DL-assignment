@@ -22,10 +22,12 @@ import os
 import argparse
 from numpy.random import default_rng
 import matplotlib.pyplot as plt
+import datetime
 from dataloader import FlowerDataset
 from utils import *
 
-def get_random_batch(dataset, n=20, seed = -1):
+NROW, NCOL = 3,4
+def get_random_batch(dataset, n=NROW * NCOL, seed = -1):
     total = len(dataset)
     if seed == -1:
         rng = default_rng()
@@ -64,18 +66,26 @@ def save_as_grids(batched_tensors, info, save_as):
         labels (list or torch tensor): Labels with shape [B].
         save_as (str): Save as path.
     """
-    plt.GridSpec(2, 2).update(wspace=0.5, hspace=0.5)
     batched_tensors = batched_tensors.detach().cpu().numpy().transpose((0,2,3,1))
     fig = plt.figure()
+    fig.subplots_adjust(left=0.1,
+                    bottom=0.1,
+                    right=0.9,
+                    top=0.9,
+                    wspace=0.4,
+                    hspace=0.4)
     fig.suptitle(f"Loss evaluated as {info['loss']:.4f}", fontsize=16)
-    for ind in range(20):
-        ax = plt.subplot(4, 5, ind+1)
+    for ind in range(NROW*NCOL):
+        ax = plt.subplot(NROW, NCOL, ind+1)
         ax.set_title(info["captions"][ind], size=10)
         ax.imshow(batched_tensors[ind])
-
-    plt.show()
+    fig.set_size_inches(16, 14)
+    fig.savefig(save_as, dpi=120)
 
 if __name__ == "__main__":
+    os.makedirs("./output/", exist_ok=True)
+    timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H%M%S")
+    image_output = os.path.join("./output/", f"grid_{timestamp}.jpg")
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model-path", type=str)
     parser.add_argument("-s", "--seed", type=int, default=-1)
@@ -94,6 +104,6 @@ if __name__ == "__main__":
     # Create comparison labels 
     info = create_comparison(batch_label, predictions)
     # Show grid
-    save_as_grids(batch_input, info, "")
+    save_as_grids(batch_input, info, image_output)
 
     

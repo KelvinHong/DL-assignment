@@ -1,5 +1,6 @@
 import os
 from tqdm import tqdm
+import datetime
 from torch.utils.tensorboard import SummaryWriter
 from utils import *
 
@@ -45,15 +46,14 @@ def eval(**kwargs):
 
 if __name__ == "__main__":
     os.makedirs("./model/", exist_ok = True)
-    model_path = "./model/model_test3.pth"
-    if os.path.isfile(model_path):
-        print(f"The model path {model_path} already exists, please choose another file name.")
-        exit()
+    timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H%M%S")
+    model_dir = f"./model/TS{timestamp}/"
+    os.makedirs(model_dir)
 
     model = baseCAM().to(DEVICE)
     dls = get_dataloaders(split=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    epochs = 50
+    epochs = 75
     best_valid_loss = float("inf")
     for epoch in range(1, epochs+1):
         train_kwargs = {
@@ -78,6 +78,6 @@ if __name__ == "__main__":
 
         if valid_loss < best_valid_loss:
             best_valid_loss = valid_loss
-            custom_save(model, model_path)
+            custom_save(model, os.path.join(model_dir, f"epoch_{epoch}.pth"))
             print(f"Model saved at epoch {epoch}.")
     writer.close()
