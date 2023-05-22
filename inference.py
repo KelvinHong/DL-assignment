@@ -106,4 +106,7 @@ if __name__ == "__main__":
     # Show grid
     save_as_grids(batch_input, info, image_output)
 
+    # Test CAM
+    model.get_cam(batch_input)
+
     

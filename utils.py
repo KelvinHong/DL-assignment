@@ -76,6 +76,26 @@ class baseCAM(nn.Module):
         x = self.last_dense(x)
         return x
     
+    def get_cam(self, x):
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = self.generate_maps(x) # Output [B, 17, 7, 7]
+        # Get predictions first
+        pred = self.last_dense(self.gap(x)) # [B, 17]
+        pred_indices = torch.argmax(pred, dim=1)
+        # Rearrange into [B, 7, 7, 17] to be able to use linear layer
+        x = torch.permute(x, dims=(0,2,3,1))
+        x = self.last_dense(x) # get [B, 7, 7, 17]
+        x = torch.permute(x, dims=(0,3,1,2)) # [B, 17, 7, 7]
+        x = x[range(x.shape[0]), pred_indices].unsqueeze(1) # [B, 1, 7, 7]
+        # Normalize each map by its individual maximum
+        x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
+        x = torchvision.transforms.Resize((256,256))(x)
+        
+        grid = torchvision.utils.make_grid(x, nrow=4)
+        torchvision.utils.save_image(grid, "output/cam_1.jpg")
+        return x
+    
 def custom_save(model, path):
     """Save CAM model but only with its trainable parameters, 
     its feature extractor counterpart isn't saved.
