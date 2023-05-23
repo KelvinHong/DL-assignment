@@ -21,9 +21,11 @@ def load_splits(split=1):
     train_split = mat[f"trn{split}"][0]-1
     train_split = [10*s+j for s in train_split for j in range(10)]
     test_split = mat[f"tst{split}"][0]-1
-    test_split = [10*s+j for s in test_split for j in range(10)]
+    # test_split = [10*s+j for s in test_split for j in range(10)]
+    test_split = [10*s for s in test_split]
     valid_split = mat[f"val{split}"][0]-1
-    valid_split = [10*s+j for s in valid_split for j in range(10)]
+    # valid_split = [10*s+j for s in valid_split for j in range(10)]
+    valid_split = [10*s for s in valid_split]
     
     return train_split, test_split, valid_split
 
