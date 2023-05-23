@@ -18,20 +18,20 @@ def load_splits(split=1):
     # Now minus 1 to get 0-based indices.
     mat = scipy.io.loadmat('data/datasplits.mat')
     assert split in [1,2,3], "Split can be 1,2,3 only."
-    return mat[f"trn{split}"][0]-1,\
-            mat[f"tst{split}"][0]-1,\
-            mat[f"val{split}"][0]-1
+    train_split = mat[f"trn{split}"][0]-1
+    train_split = [10*s+j for s in train_split for j in range(10)]
+    test_split = mat[f"tst{split}"][0]-1
+    test_split = [10*s+j for s in test_split for j in range(10)]
+    valid_split = mat[f"val{split}"][0]-1
+    valid_split = [10*s+j for s in valid_split for j in range(10)]
+    
+    return train_split, test_split, valid_split
 
 def get_dataloaders(split=1):
     strain, stest, sval = load_splits(split)
     batch_size = 8
 
-    dataset = dataloader.FlowerDataset(transform = transforms.Compose(
-        [
-            dataloader.Rescale((256,256)),
-            dataloader.ToTensor(),
-        ]
-    ))
+    dataset = dataloader.FlowerDataset()
 
     train_dataset = Subset(dataset, strain)
     test_dataset = Subset(dataset, stest)
@@ -148,5 +148,5 @@ if __name__ == "__main__":
         features = model(input_batch)
 
     # Print the shape of the feature map
-    print(features.shape)
-    print(features)
+    # print(features.shape)
+    # print(features)

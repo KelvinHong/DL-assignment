@@ -53,7 +53,7 @@ if __name__ == "__main__":
     model = baseCAM().to(DEVICE)
     dls = get_dataloaders(split=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    epochs = 75
+    epochs = 50
     best_valid_loss = float("inf")
     for epoch in range(1, epochs+1):
         train_kwargs = {
