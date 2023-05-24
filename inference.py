@@ -99,13 +99,28 @@ if __name__ == "__main__":
     model = partial_load_state_dict(model, args.model_path).to(DEVICE)
     model.eval()
     batch_input, batch_label = get_random_batch(valid_dataset, seed=args.seed)
+    B = batch_input.shape[0]
     batch_input = batch_input.to(DEVICE)
     predictions = model(batch_input)
     # Create comparison labels 
     info = create_comparison(batch_label, predictions)
 
     # Test CAM
-    heatmaps, overlapped = model.get_cam(batch_input)
+    cams = model.get_cam(batch_input)
+    # Only preserve >0.3 part
+    cams[cams<0.3] = 0
+    # Convert to pil then overlap heatmaps
+    inputs = unnormalize(batch_input)
+    overlapped = []
+    for ind in range(B):
+        # print(inputs[ind].min(), inputs[ind].max())
+        # print(heatmaps[ind].min(), heatmaps[ind].max())
+        img = TF.to_pil_image(inputs[ind]) 
+        h_img = TF.to_pil_image(torch.clamp(1.5*cams[ind], max=1)) # Emphasize heatmap
+        res = Image.blend(img, h_img, 0.5)
+        res = transforms.ToTensor()(res)
+        overlapped.append(torch.clone(res))
+    overlapped = torch.stack(overlapped)
     save_as_grids(overlapped, info, image_output)
 
     

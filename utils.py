@@ -46,6 +46,11 @@ def get_dataloaders(split=1):
     
     return {"train": train_dl, "test": test_dl, "valid": valid_dl}
 
+def unnormalize(x: torch.Tensor) -> torch.Tensor:
+    return dataloader.Unnormalize(
+            mean = torch.tensor([0.485, 0.456, 0.406]).to(DEVICE),
+            std = torch.tensor([0.229, 0.224, 0.225]).to(DEVICE),
+        )(x)
 
 class baseCAM(nn.Module):
     def __init__(self):
@@ -59,7 +64,7 @@ class baseCAM(nn.Module):
         self.features = base.features
         self.avgpool = base.avgpool
 
-        # Make the number of feature maps equals to 10.
+        # Make the number of feature maps equals to 17.
         self.generate_maps = nn.Sequential(
             nn.Conv2d(512, 17, 1),
             nn.ReLU(),
@@ -69,7 +74,6 @@ class baseCAM(nn.Module):
             nn.Flatten(start_dim = 1), # (B, 17)
         )
         self.last_dense = nn.Linear(17, 17, bias=False)
-        self.softmax = nn.Softmax(dim=1)
 
     def forward(self, x):
         x = self.features(x)
@@ -80,10 +84,7 @@ class baseCAM(nn.Module):
         return x
     
     def get_cam(self, x):
-        inputs = dataloader.Unnormalize(
-            mean = torch.tensor([0.485, 0.456, 0.406]).to(DEVICE),
-            std = torch.tensor([0.229, 0.224, 0.225]).to(DEVICE),
-        )(torch.clone(x))
+        # Return CAMs with values normalized within 0 to 1.
         B = x.shape[0]
         x = self.features(x)
         x = self.avgpool(x)
@@ -101,20 +102,51 @@ class baseCAM(nn.Module):
         x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
         x = torchvision.transforms.Resize((256,256))(x) #[B, 1, 256, 256]
         # Use map as red channel, create zeros for green and blue channels.
-        heatmaps = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
-        # Only preserve >0.3 part
-        heatmaps[heatmaps<0.3] = 0
-        # Convert to pil then overlap heatmaps
-        overlapped = []
-        for ind in range(B):
-            # print(inputs[ind].min(), inputs[ind].max())
-            # print(heatmaps[ind].min(), heatmaps[ind].max())
-            img = TF.to_pil_image(inputs[ind]) 
-            h_img = TF.to_pil_image(torch.clamp(1.5*heatmaps[ind], max=1)) # Emphasize heatmap
-            res = Image.blend(img, h_img, 0.5)
-            res = transforms.ToTensor()(res)
-            overlapped.append(torch.clone(res))
-        return heatmaps, torch.stack(overlapped) # Both [B, 3, 256, 256], 0-1.
+        cams = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
+        return cams # [B, 3, 256, 256]
+    
+class ReCAM(baseCAM):
+    def __init__(self):
+        super(ReCAM, self).__init__()
+        
+    def recam_features(self, x):
+        # Get cams then resize to agrees feature maps
+        single_cams = super().get_cam(x)[:, :1, :, :] # [B, 1, 256, 256]
+        single_cams = torchvision.transforms.Resize((7, 7))(single_cams) # [B, 1, 7, 7]
+        # Get features
+        features = self.generate_maps(self.avgpool(self.features(x))) # [B, 17, 7, 7]
+        # Multiply features with cams
+        features = features * single_cams # [B, 17, 7, 7]
+        return features
+
+    def forward(self, x):
+        features = self.recam_features(x) # [B, 17, 7, 7]
+        # Use the weighted features for classification.
+        pred = self.last_dense(self.gap(features)) # [B, 17]
+        return pred
+    
+    def get_recam(self, x):
+        x = self.recam_features(x) # [B, 17, 7, 7]
+        B = x.shape[0]
+        # Use the weighted features for recam calculation.
+        # Get predictions first
+        pred = self.last_dense(self.gap(x)) # [B, 17]
+        pred_indices = torch.argmax(pred, dim=1)
+        # Rearrange into [B, 7, 7, 17] to be able to use linear layer
+        x = torch.permute(x, dims=(0,2,3,1))
+        x = self.last_dense(x) # get [B, 7, 7, 17]
+        x = torch.permute(x, dims=(0,3,1,2)) # [B, 17, 7, 7]
+        x = x[range(x.shape[0]), pred_indices].unsqueeze(1) # [B, 1, 7, 7]
+        # Normalize each map by its individual maximum
+        x = x - x.flatten(start_dim=1).min(1)[0].view(-1,1,1,1)
+        x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
+        x = torchvision.transforms.Resize((256,256))(x) #[B, 1, 256, 256]
+        # Use map as red channel, create zeros for green and blue channels.
+        cams = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
+        return cams # [B, 3, 256, 256]
+
+    
+
     
 def custom_save(model, path):
     """Save CAM model but only with its trainable parameters, 
@@ -145,19 +177,17 @@ def partial_load_state_dict(model, path):
 
 if __name__ == "__main__":
     # Create an instance of the VGG16FeaturesOnly model
-    model = baseCAM()
+    model = ReCAM().to(DEVICE)
     # print(sum(p.numel() for p in model.parameters() if p.requires_grad))
     # Load and preprocess your input image
-    input_image = Image.open("./data/jpg/image_0001.jpg")  # Replace with your input image tensor or path
+    input_image = Image.open("./data/auged/image_0001_0.jpg")  # Replace with your input image tensor or path
 
     # Preprocess the input image using the same transformations as used during training
     preprocess = transforms.Compose([
-        transforms.Resize(256),
-        transforms.CenterCrop(224),
         transforms.ToTensor(),
         transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])
     ])
-    input_tensor = preprocess(input_image)
+    input_tensor = preprocess(input_image).to(DEVICE)
     input_batch = input_tensor.unsqueeze(0)
 
     # Set the model to evaluation mode

@@ -44,12 +44,7 @@ def eval(**kwargs):
     epoch_loss /= num_batch
     return epoch_loss
 
-if __name__ == "__main__":
-    os.makedirs("./model/", exist_ok = True)
-    timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H%M%S")
-    model_dir = f"./model/TS{timestamp}/"
-    os.makedirs(model_dir)
-
+def CAM_workflow(model_dir: str):
     model = baseCAM().to(DEVICE)
     dls = get_dataloaders(split=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
@@ -81,3 +76,47 @@ if __name__ == "__main__":
             custom_save(model, os.path.join(model_dir, f"epoch_{epoch}.pth"))
             print(f"Model saved at epoch {epoch}.")
     writer.close()
+
+def ReCAM_workflow(model_dir: str):
+    # Following this https://arxiv.org/pdf/2203.00962.pdf
+    model = ReCAM().to(DEVICE)
+    dls = get_dataloaders(split=1)
+    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
+    epochs = 50
+    best_valid_loss = float("inf")
+    for epoch in range(1, epochs+1):
+        train_kwargs = {
+            "model": model,
+            "dataloader": dls["train"],
+            "optimizer": optimizer,
+            "epoch": epoch,
+        }
+        
+        train_loss = train(**train_kwargs)
+
+        eval_kwargs = {
+            "model": model,
+            "dataloader": dls["valid"],
+            "epoch": epoch,
+        }
+
+        valid_loss = eval(**eval_kwargs)
+
+        print(f"Epoch {epoch}, Train vs Valid")
+        print(f"\t{train_loss:.6f} vs {valid_loss:.6f}")
+
+        if valid_loss < best_valid_loss:
+            best_valid_loss = valid_loss
+            custom_save(model, os.path.join(model_dir, f"epoch_{epoch}.pth"))
+            print(f"Model saved at epoch {epoch}.")
+    writer.close()
+
+if __name__ == "__main__":
+    os.makedirs("./model/", exist_ok = True)
+    timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H%M%S")
+    model_dir = f"./model/TS{timestamp}_ReCAM/"
+    os.makedirs(model_dir)
+
+    ReCAM_workflow(model_dir)
+
+    
