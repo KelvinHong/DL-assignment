@@ -100,7 +100,8 @@ class baseCAM(nn.Module):
         # Normalize each map by its individual maximum
         x = x - x.flatten(start_dim=1).min(1)[0].view(-1,1,1,1)
         x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
-        x = torchvision.transforms.Resize((256,256))(x) #[B, 1, 256, 256]
+        x = torch.nn.functional.interpolate(x, (256, 256), mode="bilinear")
+        # x = torchvision.transforms.Resize((256,256))(x) #[B, 1, 256, 256]
         # Use map as red channel, create zeros for green and blue channels.
         cams = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
         return cams # [B, 3, 256, 256]
@@ -112,7 +113,7 @@ class ReCAM(baseCAM):
     def recam_features(self, x):
         # Get cams then resize to agrees feature maps
         single_cams = super().get_cam(x)[:, :1, :, :] # [B, 1, 256, 256]
-        single_cams = torchvision.transforms.Resize((7, 7))(single_cams) # [B, 1, 7, 7]
+        single_cams = torch.nn.functional.interpolate(single_cams, (7, 7), mode="bilinear") # [B, 1, 7, 7]
         # Get features
         features = self.generate_maps(self.avgpool(self.features(x))) # [B, 17, 7, 7]
         # Multiply features with cams
@@ -140,7 +141,7 @@ class ReCAM(baseCAM):
         # Normalize each map by its individual maximum
         x = x - x.flatten(start_dim=1).min(1)[0].view(-1,1,1,1)
         x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
-        x = torchvision.transforms.Resize((256,256))(x) #[B, 1, 256, 256]
+        x = torch.nn.functional.interpolate(x, (256, 256), mode="bilinear") #[B, 1, 256, 256]
         # Use map as red channel, create zeros for green and blue channels.
         cams = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
         return cams # [B, 3, 256, 256]
