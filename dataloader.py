@@ -57,6 +57,17 @@ class Normalize(object):
     def __call__(self, image):
         # Expect image to be tensor [3, H, W]
         return (image - self.mean) / self.std
+    
+class Unnormalize(object):
+
+    def __init__(self, mean, std):
+        # mean and std must be torch tensors.
+        self.mean = mean.view(3, 1, 1) # list of 3 numbers
+        self.std = std.view(3, 1, 1) # list of 3 numbers
+
+    def __call__(self, image):
+        # Expect image to be tensor [3, H, W]
+        return image*self.std + self.mean
 
 class FlowerDataset(Dataset):
     """Face Landmarks dataset."""

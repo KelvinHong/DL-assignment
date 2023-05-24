@@ -103,10 +103,9 @@ if __name__ == "__main__":
     predictions = model(batch_input)
     # Create comparison labels 
     info = create_comparison(batch_label, predictions)
-    # Show grid
-    save_as_grids(batch_input, info, image_output)
 
     # Test CAM
-    model.get_cam(batch_input)
+    heatmaps, overlapped = model.get_cam(batch_input)
+    save_as_grids(overlapped, info, image_output)
 
     

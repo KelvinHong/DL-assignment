@@ -4,6 +4,7 @@ from torch.utils.data import DataLoader, Subset
 import torchvision
 import torchvision.models as models
 import torchvision.transforms as transforms
+import torchvision.transforms.functional as TF
 from PIL import Image
 import scipy.io
 import dataloader
@@ -79,6 +80,11 @@ class baseCAM(nn.Module):
         return x
     
     def get_cam(self, x):
+        inputs = dataloader.Unnormalize(
+            mean = torch.tensor([0.485, 0.456, 0.406]).to(DEVICE),
+            std = torch.tensor([0.229, 0.224, 0.225]).to(DEVICE),
+        )(torch.clone(x))
+        B = x.shape[0]
         x = self.features(x)
         x = self.avgpool(x)
         x = self.generate_maps(x) # Output [B, 17, 7, 7]
@@ -91,12 +97,24 @@ class baseCAM(nn.Module):
         x = torch.permute(x, dims=(0,3,1,2)) # [B, 17, 7, 7]
         x = x[range(x.shape[0]), pred_indices].unsqueeze(1) # [B, 1, 7, 7]
         # Normalize each map by its individual maximum
+        x = x - x.flatten(start_dim=1).min(1)[0].view(-1,1,1,1)
         x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
-        x = torchvision.transforms.Resize((256,256))(x)
-        
-        grid = torchvision.utils.make_grid(x, nrow=4)
-        torchvision.utils.save_image(grid, "output/cam_1.jpg")
-        return x
+        x = torchvision.transforms.Resize((256,256))(x) #[B, 1, 256, 256]
+        # Use map as red channel, create zeros for green and blue channels.
+        heatmaps = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
+        # Only preserve >0.3 part
+        heatmaps[heatmaps<0.3] = 0
+        # Convert to pil then overlap heatmaps
+        overlapped = []
+        for ind in range(B):
+            # print(inputs[ind].min(), inputs[ind].max())
+            # print(heatmaps[ind].min(), heatmaps[ind].max())
+            img = TF.to_pil_image(inputs[ind]) 
+            h_img = TF.to_pil_image(torch.clamp(1.5*heatmaps[ind], max=1)) # Emphasize heatmap
+            res = Image.blend(img, h_img, 0.5)
+            res = transforms.ToTensor()(res)
+            overlapped.append(torch.clone(res))
+        return heatmaps, torch.stack(overlapped) # Both [B, 3, 256, 256], 0-1.
     
 def custom_save(model, path):
     """Save CAM model but only with its trainable parameters, 
