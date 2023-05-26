@@ -7,7 +7,11 @@ import matplotlib.pyplot as plt
 from torch.utils.data import Dataset, DataLoader
 from torchvision import transforms, utils
 
-    
+try:
+    import google.colab
+    IN_COLAB = True
+except:
+    IN_COLAB = False
 
 
 # class Rescale(object):
@@ -80,7 +84,12 @@ class FlowerDataset(Dataset):
             transform (callable, optional): Optional transform to be applied
                 on a sample.
         """
-        self.data_root = data_root
+        if IN_COLAB:
+            # Use native colab storage when using google colab
+            # since loading dataset from google drive to colab takes a long time.
+            self.data_root = "/content/data/auged/"
+        else:
+            self.data_root = data_root
         if not os.path.isdir(data_root):
             raise ValueError("Please run augment.py script before using dataset. ")
         if transform is None:
