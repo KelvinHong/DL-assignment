@@ -54,12 +54,15 @@ def unnormalize(x: torch.Tensor) -> torch.Tensor:
 
 def normalize_cam_by_method(x, method="minmax"):
     # x is the output from linear layer applied on features
-    # method is the method used for normalizing, currently accept minmax and sigmoid.
+    # method is the method used for normalizing, currently accept minmax, sigmoid and relu.
     if method == "minmax":
         x = x - x.flatten(start_dim=1).min(1)[0].view(-1,1,1,1)
         x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
     elif method == "sigmoid":
-        x = torch.nn.functional.sigmoid(x)
+        x = torch.sigmoid(x)
+    elif method == "relu":
+        x = torch.nn.functional.relu(x)
+        x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) 
     else:
         raise NotImplementedError(f"Method [{method}] is not implemented yet.")
     return x
@@ -98,7 +101,7 @@ class baseCAM(nn.Module):
         x = self.last_dense(x)
         return x
     
-    def get_cam(self, x):
+    def get_cam(self, x, ov_normalize: str = None):
         # normalize_by can choose "minmax" or "sigmoid"
         # Return CAMs with values normalized within 0 to 1.
         B = x.shape[0]
@@ -114,7 +117,10 @@ class baseCAM(nn.Module):
         x = torch.permute(x, dims=(0,3,1,2)) # [B, 17, 7, 7]
         x = x[range(x.shape[0]), pred_indices].unsqueeze(1) # [B, 1, 7, 7]
         # Normalize each map by its individual maximum
-        x = normalize_cam_by_method(x, method=self.normalize_by)
+        if ov_normalize is None:
+            x = normalize_cam_by_method(x, method=self.normalize_by)
+        else:
+            x = normalize_cam_by_method(x, method=ov_normalize)
         x = torch.nn.functional.interpolate(x, (256, 256), mode="bilinear")
         # x = torchvision.transforms.Resize((256,256))(x) #[B, 1, 256, 256]
         # Use map as red channel, create zeros for green and blue channels.
@@ -127,7 +133,7 @@ class ReCAM(baseCAM):
         
     def recam_features(self, x):
         # Get cams then resize to agrees feature maps
-        single_cams = super().get_cam(x)[:, :1, :, :] # [B, 1, 256, 256]
+        single_cams = super().get_cam(x, self.normalize_by)[:, :1, :, :] # [B, 1, 256, 256]
         single_cams = torch.nn.functional.interpolate(single_cams, (7, 7), mode="bilinear") # [B, 1, 7, 7]
         # Get features
         features = self.generate_maps(self.avgpool(self.features(x))) # [B, 17, 7, 7]

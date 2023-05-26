@@ -87,11 +87,11 @@ def postprocess(cams):
     cams = torch.clamp(1.5*cams, max=1)
     return cams
 
-def inference_workflow(model_path, model_type, save_as, seed=-1):
+def inference_workflow(model_path, model_type, normalize_by, save_as, seed=-1):
     if model_type == "CAM":
-        model = baseCAM().to(DEVICE)
+        model = baseCAM(normalize_by).to(DEVICE)
     elif model_type == "ReCAM":
-        model = ReCAM().to(DEVICE)
+        model = ReCAM(normalize_by).to(DEVICE)
     model = partial_load_state_dict(model, args.model_path).to(DEVICE)
     model.eval()
     batch_input, batch_label = get_random_batch(valid_dataset, seed=args.seed)
@@ -128,6 +128,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model-path", type=str)
     parser.add_argument("-t", "--model-type", type=str, default="CAM") # Can also be ReCAM
+    parser.add_argument("-n", "--normalize-by", type=str, default="minmax")
     parser.add_argument("-s", "--seed", type=int, default=-1)
     args = parser.parse_args()
     timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H%M%S")
@@ -137,7 +138,7 @@ if __name__ == "__main__":
     strain, stest, sval = load_splits(split=1)
     valid_dataset = Subset(d, sval)
     # Start
-    inference_workflow(args.model_path, args.model_type, save_as = image_output, seed = args.seed)
+    inference_workflow(args.model_path, args.model_type, normalize_by = args.normalize_by, save_as = image_output, seed = args.seed)
     
 
     

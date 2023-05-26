@@ -116,7 +116,7 @@ def ReCAM_workflow(model_dir: str, normalize_by="minmax"):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model-type", help="Choose from 'CAM' or 'ReCAM'", type=str)
-    parser.add_argument("-n", "--normalize-by", help="Choose from 'minmax' or 'sigmoid', defaults to 'minmax'.", type=str, default='minmax')
+    parser.add_argument("-n", "--normalize-by", help="Choose from 'minmax', 'sigmoid' or 'relu', defaults to 'minmax'.", type=str, default='minmax')
     args = parser.parse_args()
     os.makedirs("./model/", exist_ok = True)
     timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H%M%S")
