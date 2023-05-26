@@ -126,10 +126,13 @@ if __name__ == "__main__":
     # No need to touch below
     model_dir = f"./model/TS{timestamp}_{model_type}/"
     os.makedirs(model_dir)
-
+    
     filename = os.path.join(model_dir, "training_logs.txt")
+    # Record model meta 
+    with open(filename, "w") as f:
+        f.write(f"Model type: [{model_type}], using [{normalize_by}] normalizing method.\n")
     # Redirect output to the file
-    sys.stdout = open(filename, "w")
+    sys.stdout = open(filename, "a")
     if model_type == "CAM":
         CAM_workflow(model_dir, normalize_by=normalize_by)
     elif model_type == "ReCAM":
