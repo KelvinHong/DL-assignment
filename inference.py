@@ -82,6 +82,11 @@ def save_as_grids(batched_tensors, info, save_as):
     fig.set_size_inches(16, 14)
     fig.savefig(save_as, dpi=120)
 
+def postprocess(cams):
+    cams[cams<0.3] = 0
+    cams = torch.clamp(1.5*cams, max=1)
+    return cams
+
 def inference_workflow(model_path, model_type, save_as, seed=-1):
     if model_type == "CAM":
         model = baseCAM().to(DEVICE)
@@ -101,8 +106,8 @@ def inference_workflow(model_path, model_type, save_as, seed=-1):
         cams = model.get_cam(batch_input)
     elif model_type == "ReCAM":
         cams = model.get_recam(batch_input)
-    # Only preserve >0.3 part
-    cams[cams<0.3] = 0
+    # Post-process CAMs for better visualization
+    cams = postprocess(cams)
     # Convert to pil then overlap heatmaps
     inputs = unnormalize(batch_input)
     overlapped = []
@@ -110,7 +115,7 @@ def inference_workflow(model_path, model_type, save_as, seed=-1):
         # print(inputs[ind].min(), inputs[ind].max())
         # print(heatmaps[ind].min(), heatmaps[ind].max())
         img = TF.to_pil_image(inputs[ind]) 
-        h_img = TF.to_pil_image(torch.clamp(1.5*cams[ind], max=1)) # Emphasize heatmap
+        h_img = TF.to_pil_image(cams[ind]) # Emphasize heatmap
         res = Image.blend(img, h_img, 0.5)
         res = transforms.ToTensor()(res)
         overlapped.append(torch.clone(res))

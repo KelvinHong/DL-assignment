@@ -52,8 +52,20 @@ def unnormalize(x: torch.Tensor) -> torch.Tensor:
             std = torch.tensor([0.229, 0.224, 0.225]).to(DEVICE),
         )(x)
 
+def normalize_cam_by_method(x, method="minmax"):
+    # x is the output from linear layer applied on features
+    # method is the method used for normalizing, currently accept minmax and sigmoid.
+    if method == "minmax":
+        x = x - x.flatten(start_dim=1).min(1)[0].view(-1,1,1,1)
+        x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
+    elif method == "sigmoid":
+        x = torch.nn.functional.sigmoid(x)
+    else:
+        raise NotImplementedError(f"Method [{method}] is not implemented yet.")
+    return x
+
 class baseCAM(nn.Module):
-    def __init__(self):
+    def __init__(self, normalize_by: str = "minmax"):
         super(baseCAM, self).__init__()
         base = models.vgg16(weights='DEFAULT')
         # Freeze these parameters
@@ -75,6 +87,9 @@ class baseCAM(nn.Module):
         )
         self.last_dense = nn.Linear(17, 17, bias=False)
 
+        # How to normalize the CAM
+        self.normalize_by = normalize_by
+
     def forward(self, x):
         x = self.features(x)
         x = self.avgpool(x)
@@ -84,6 +99,7 @@ class baseCAM(nn.Module):
         return x
     
     def get_cam(self, x):
+        # normalize_by can choose "minmax" or "sigmoid"
         # Return CAMs with values normalized within 0 to 1.
         B = x.shape[0]
         x = self.features(x)
@@ -98,8 +114,7 @@ class baseCAM(nn.Module):
         x = torch.permute(x, dims=(0,3,1,2)) # [B, 17, 7, 7]
         x = x[range(x.shape[0]), pred_indices].unsqueeze(1) # [B, 1, 7, 7]
         # Normalize each map by its individual maximum
-        x = x - x.flatten(start_dim=1).min(1)[0].view(-1,1,1,1)
-        x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
+        x = normalize_cam_by_method(x, method=self.normalize_by)
         x = torch.nn.functional.interpolate(x, (256, 256), mode="bilinear")
         # x = torchvision.transforms.Resize((256,256))(x) #[B, 1, 256, 256]
         # Use map as red channel, create zeros for green and blue channels.
@@ -107,8 +122,8 @@ class baseCAM(nn.Module):
         return cams # [B, 3, 256, 256]
     
 class ReCAM(baseCAM):
-    def __init__(self):
-        super(ReCAM, self).__init__()
+    def __init__(self, normalize_by: str = "minmax"):
+        super(ReCAM, self).__init__(normalize_by=normalize_by)
         
     def recam_features(self, x):
         # Get cams then resize to agrees feature maps
@@ -127,6 +142,7 @@ class ReCAM(baseCAM):
         return pred
     
     def get_recam(self, x):
+        # normalize_by can choose "minmax" or "sigmoid"
         x = self.recam_features(x) # [B, 17, 7, 7]
         B = x.shape[0]
         # Use the weighted features for recam calculation.
@@ -136,11 +152,11 @@ class ReCAM(baseCAM):
         # Rearrange into [B, 7, 7, 17] to be able to use linear layer
         x = torch.permute(x, dims=(0,2,3,1))
         x = self.last_dense(x) # get [B, 7, 7, 17]
+        # Rearrange back to [B, 17, 7, 7]
         x = torch.permute(x, dims=(0,3,1,2)) # [B, 17, 7, 7]
         x = x[range(x.shape[0]), pred_indices].unsqueeze(1) # [B, 1, 7, 7]
         # Normalize each map by its individual maximum
-        x = x - x.flatten(start_dim=1).min(1)[0].view(-1,1,1,1)
-        x = x / x.flatten(start_dim=1).max(1)[0].view(-1,1,1,1) # [B, 1, 7, 7]
+        x = normalize_cam_by_method(x, method=self.normalize_by)
         x = torch.nn.functional.interpolate(x, (256, 256), mode="bilinear") #[B, 1, 256, 256]
         # Use map as red channel, create zeros for green and blue channels.
         cams = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)

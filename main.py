@@ -1,6 +1,8 @@
 import os
 from tqdm import tqdm
 import datetime
+import argparse
+import sys # Used for redirect model training output
 from torch.utils.tensorboard import SummaryWriter
 from utils import *
 
@@ -44,8 +46,8 @@ def eval(**kwargs):
     epoch_loss /= num_batch
     return epoch_loss
 
-def CAM_workflow(model_dir: str):
-    model = baseCAM().to(DEVICE)
+def CAM_workflow(model_dir: str, normalize_by="minmax"):
+    model = baseCAM(normalize_by=normalize_by).to(DEVICE)
     dls = get_dataloaders(split=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     epochs = 50
@@ -77,9 +79,9 @@ def CAM_workflow(model_dir: str):
             print(f"Model saved at epoch {epoch}.")
     writer.close()
 
-def ReCAM_workflow(model_dir: str):
+def ReCAM_workflow(model_dir: str, normalize_by="minmax"):
     # Following this https://arxiv.org/pdf/2203.00962.pdf
-    model = ReCAM().to(DEVICE)
+    model = ReCAM(normalize_by="minmax").to(DEVICE)
     dls = get_dataloaders(split=1)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
     epochs = 50
@@ -112,11 +114,27 @@ def ReCAM_workflow(model_dir: str):
     writer.close()
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-m", "--model-type", help="Choose from 'CAM' or 'ReCAM'", type=str)
+    parser.add_argument("-n", "--normalize-by", help="Choose from 'minmax' or 'sigmoid', defaults to 'minmax'.", type=str, default='minmax')
+    args = parser.parse_args()
     os.makedirs("./model/", exist_ok = True)
     timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H%M%S")
-    model_dir = f"./model/TS{timestamp}_ReCAM/"
+    normalize_by = args.normalize_by
+    model_type =  args.model_type
+
+    # No need to touch below
+    model_dir = f"./model/TS{timestamp}_{model_type}/"
     os.makedirs(model_dir)
 
-    ReCAM_workflow(model_dir)
-
+    filename = os.path.join(model_dir, "training_logs.txt")
+    # Redirect output to the file
+    sys.stdout = open(filename, "w")
+    if model_type == "CAM":
+        CAM_workflow(model_dir, normalize_by=normalize_by)
+    elif model_type == "ReCAM":
+        ReCAM_workflow(model_dir, normalize_by=normalize_by)
+    # Restore output to default.
+    sys.stdout.close()
+    sys.stdout = sys.__stdout__
     
