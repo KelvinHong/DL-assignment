@@ -121,6 +121,7 @@ def inference_workflow(model_path, model_type, save_as, seed=-1):
         overlapped.append(torch.clone(res))
     overlapped = torch.stack(overlapped)
     save_as_grids(overlapped, info, save_as)
+    print(f"Model inference result saved as [{os.path.abspath(save_as)}].")
 
 if __name__ == "__main__":
     os.makedirs("./output/", exist_ok=True)
