@@ -35,10 +35,10 @@ def eval(**kwargs):
     
     model.eval()
     num_batch = len(kwargs["dataloader"])
-    train_iter = iter(kwargs["dataloader"])
+    valid_iter = iter(kwargs["dataloader"])
     epoch_loss = 0
     for i in tqdm(range(num_batch), desc=f"Validate epoch {kwargs['epoch']}: "):
-        bimg, blabel = next(train_iter)
+        bimg, blabel = next(valid_iter)
         bimg, blabel = bimg.to(DEVICE), blabel.to(DEVICE)
         prediction = model(bimg)
         loss = torch.nn.functional.cross_entropy(prediction, blabel)
