@@ -4,6 +4,7 @@ import datetime
 import argparse
 import sys # Used for redirect model training output
 from torch.utils.tensorboard import SummaryWriter
+import json
 from utils import *
 
 writer = SummaryWriter()
@@ -46,11 +47,11 @@ def eval(**kwargs):
     epoch_loss /= num_batch
     return epoch_loss
 
-def CAM_workflow(model_dir: str, normalize_by="minmax"):
-    model = baseCAM(normalize_by=normalize_by).to(DEVICE)
+def CAM_workflow(model_dir: str, **kwargs):
+    model = baseCAM(normalize_by=kwargs["normalize_by"]).to(DEVICE)
     dls = get_dataloaders(split=1)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    epochs = 50
+    optimizer = torch.optim.Adam(model.parameters(), lr=kwargs["lr"])
+    epochs = kwargs["epochs"]
     best_valid_loss = float("inf")
     for epoch in range(1, epochs+1):
         train_kwargs = {
@@ -79,12 +80,12 @@ def CAM_workflow(model_dir: str, normalize_by="minmax"):
             print(f"Model saved at epoch {epoch}.")
     writer.close()
 
-def ReCAM_workflow(model_dir: str, normalize_by="minmax"):
+def ReCAM_workflow(model_dir: str, **kwargs):
     # Following this https://arxiv.org/pdf/2203.00962.pdf
-    model = ReCAM(normalize_by="minmax").to(DEVICE)
+    model = ReCAM(normalize_by=kwargs["normalize_by"]).to(DEVICE)
     dls = get_dataloaders(split=1)
-    optimizer = torch.optim.Adam(model.parameters(), lr=1e-4)
-    epochs = 50
+    optimizer = torch.optim.Adam(model.parameters(), lr=kwargs["lr"])
+    epochs = kwargs["epochs"]
     best_valid_loss = float("inf")
     for epoch in range(1, epochs+1):
         train_kwargs = {
@@ -117,6 +118,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("-m", "--model-type", help="Choose from 'CAM' or 'ReCAM'", type=str)
     parser.add_argument("-n", "--normalize-by", help="Choose from 'minmax', 'sigmoid' or 'relu', defaults to 'minmax'.", type=str, default='minmax')
+    parser.add_argument("-l", "--lr", help="Learning rate, defaults to 1e-4.", default=1e-4, type=float)
+    parser.add_argument("-e", "--epochs", help="Number of epochs, defaults to 50.", default=50, type=int)
     args = parser.parse_args()
     os.makedirs("./model/", exist_ok = True)
     timestamp = datetime.datetime.now().strftime("%d-%m-%Y_%H%M%S")
@@ -126,6 +129,15 @@ if __name__ == "__main__":
     # No need to touch below
     model_dir = f"./model/TS{timestamp}_{model_type}/"
     os.makedirs(model_dir)
+
+    training_kwargs = {
+        "epochs": args.epochs,
+        "lr": args.lr,
+        "normalize_by": args.normalize_by,
+    }
+    # Save keywords
+    with open(os.path.join(model_dir, "config.json"), "w") as f:
+        f.write(json.dumps(training_kwargs, indent=4))
     
     filename = os.path.join(model_dir, "training_logs.txt")
     # Record model meta 
@@ -134,9 +146,9 @@ if __name__ == "__main__":
     # Redirect output to the file
     sys.stdout = open(filename, "a")
     if model_type == "CAM":
-        CAM_workflow(model_dir, normalize_by=normalize_by)
+        CAM_workflow(model_dir, **training_kwargs)
     elif model_type == "ReCAM":
-        ReCAM_workflow(model_dir, normalize_by=normalize_by)
+        ReCAM_workflow(model_dir, **training_kwargs)
     # Restore output to default.
     sys.stdout.close()
     sys.stdout = sys.__stdout__
