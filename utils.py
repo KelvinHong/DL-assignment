@@ -131,7 +131,6 @@ class baseCAM(nn.Module):
         # Zero out gradient from the model first
         for param in self.parameters():
             param.grad = None
-        # normalize_by can choose "minmax" or "sigmoid"
         # Return CAMs with values normalized within 0 to 1.
         B = x.shape[0]
         x = self.features(x)
@@ -160,6 +159,88 @@ class baseCAM(nn.Module):
         cams = torch.nn.functional.interpolate(cams, (256, 256), mode="bilinear") # [B, 1, 256, 256]
         # Use map as red channel, create zeros for green and blue channels.
         cams = torch.cat((cams, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
+        return cams # [B, 3, 256, 256]
+    
+    def get_detail_cam(self, x):
+        # Use multiple feature maps 
+        for param in self.parameters():
+            # Unfreeze model parameters then
+            # Zero out gradient from the model first
+            param.requires_grad = True
+            param.grad = None
+        # Return CAMs with values normalized within 0 to 1.
+        B = x.shape[0]
+        # stages = [0, 5, 10, 17, 24, 31]
+        s1 = self.features[:5](x)
+        s1.retain_grad()
+        s2 = self.features[5:10](s1)
+        s2.retain_grad()
+        s3 = self.features[10:17](s2)
+        s3.retain_grad()
+        s4 = self.features[17:24](s3)
+        s4.retain_grad()
+        s5 = self.features[24:31](s4)
+        
+        s5 = self.avgpool(s5)
+        s5 = self.generate_maps(s5) # Output [B, 17, 7, 7]
+        s5.retain_grad()
+        # s5 = s5.detach() # To make a leaf node to support gradient calculation.
+        # I imagine detach will also forfeit any gradient before this tensor, which is 
+        # fine by me. 
+        # s1 = s1.detach()
+        # s2 = s2.detach()
+        # s3 = s3.detach()
+        # s4 = s4.detach()
+        # s1.requires_grad = True
+        # s2.requires_grad = True
+        # s3.requires_grad = True
+        # s4.requires_grad = True
+        # s5.requires_grad = True
+
+
+        # print(s1.shape, s2.shape, s3.shape, s4.shape, s5.shape)
+        # Get predictions first
+        pred = self.last_dense(self.gap(s5)) # [B, 17]
+        pred_indices = torch.argmax(pred, dim=1) # [B], LongTensor
+        pred_c = pred[range(B), pred_indices] # [B], FloatTensor
+        # Calculate gradient one by one
+        cams_s1, cams_s2, cams_s3, cams_s4, cams_s5 = [], [], [], [], []
+        for i in range(B):
+            # Reset all stages gradient
+            s1.grad, s2.grad, s3.grad, s4.grad, s5.grad = None, None, None, None, None
+            # Calculate gradient on ith image
+            pred_c[i].backward(retain_graph=True)
+            grad_s1 = torch.relu(torch.clone(s1.grad[i])).unsqueeze(0) # [1, 64, 128, 128]
+            grad_s2 = torch.relu(torch.clone(s2.grad[i])).unsqueeze(0) # [1, 128, 64, 64]
+            grad_s3 = torch.relu(torch.clone(s3.grad[i])).unsqueeze(0) # [1, 256, 32, 32]
+            grad_s4 = torch.relu(torch.clone(s4.grad[i])).unsqueeze(0) # [1, 512, 16, 16]
+            grad_s5 = torch.relu(torch.clone(s5.grad[i])).unsqueeze(0) # [1, 17, 7, 7]
+            # Use gradient to calculate cams
+            cam_s1 = torch.relu(torch.sum(s1[i] * grad_s1, dim=1)[0])
+            cam_s2 = torch.relu(torch.sum(s2[i] * grad_s2, dim=1)[0])
+            cam_s3 = torch.relu(torch.sum(s3[i] * grad_s3, dim=1)[0])
+            cam_s4 = torch.relu(torch.sum(s4[i] * grad_s4, dim=1)[0])
+            cam_s5 = torch.relu(torch.sum(s5[i] * grad_s5, dim=1)[0])
+            cams_s1.append(torch.clone(cam_s1 / cam_s1.max()))
+            cams_s2.append(torch.clone(cam_s2 / cam_s2.max()))
+            cams_s3.append(torch.clone(cam_s3 / cam_s3.max()))
+            cams_s4.append(torch.clone(cam_s4 / cam_s4.max()))
+            cams_s5.append(torch.clone(cam_s5 / cam_s5.max()))
+        cams_s1 = torch.stack(cams_s1, dim=0).to(DEVICE).unsqueeze(1) # [B, 1, 128, 128]
+        cams_s2 = torch.stack(cams_s2, dim=0).to(DEVICE).unsqueeze(1) # [B, 1, 64, 64]
+        cams_s3 = torch.stack(cams_s3, dim=0).to(DEVICE).unsqueeze(1) # [B, 1, 32, 32]
+        cams_s4 = torch.stack(cams_s4, dim=0).to(DEVICE).unsqueeze(1) # [B, 1, 16, 16]
+        cams_s5 = torch.stack(cams_s5, dim=0).to(DEVICE).unsqueeze(1) # [B, 1, 7, 7]
+
+        std_s1 = torch.nn.functional.interpolate(cams_s1, (256, 256), mode="bilinear") # [B, 1, 256, 256]
+        std_s2 = torch.nn.functional.interpolate(cams_s2, (256, 256), mode="bilinear") # [B, 1, 256, 256]
+        std_s3 = torch.nn.functional.interpolate(cams_s3, (256, 256), mode="bilinear") # [B, 1, 256, 256]
+        std_s4 = torch.nn.functional.interpolate(cams_s4, (256, 256), mode="bilinear") # [B, 1, 256, 256]
+        std_s5 = torch.nn.functional.interpolate(cams_s5, (256, 256), mode="bilinear") # [B, 1, 256, 256]
+
+        final_cams = (std_s3 + std_s4 + std_s5) / 3
+        # Use map as red channel, create zeros for green and blue channels.
+        cams = torch.cat((final_cams, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
         return cams # [B, 3, 256, 256]
     
 class ReCAM(baseCAM):
@@ -201,45 +282,6 @@ class ReCAM(baseCAM):
         x = torch.nn.functional.interpolate(x, (256, 256), mode="bilinear") #[B, 1, 256, 256]
         # Use map as red channel, create zeros for green and blue channels.
         cams = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
-        return cams # [B, 3, 256, 256]
-
-class SingleLayerCAM(baseCAM):
-    def __init__(self):
-        super(SingleLayerCAM, self).__init__()
-
-    def get_cam(self, x):
-        # Zero out gradient from the model first
-        for param in self.parameters():
-            param.grad = None
-        # normalize_by can choose "minmax" or "sigmoid"
-        # Return CAMs with values normalized within 0 to 1.
-        B = x.shape[0]
-        x = self.features(x)
-        x = self.avgpool(x)
-        x = self.generate_maps(x) # Output [B, 17, 7, 7]
-        x = x.detach() # To make a leaf node to support gradient calculation.
-        # I imagine detach will also forfeit any gradient before this tensor, which is 
-        # fine by me. 
-        x.requires_grad = True
-        # Get predictions first
-        pred = self.last_dense(self.gap(x)) # [B, 17]
-        pred_indices = torch.argmax(pred, dim=1) # [B], LongTensor
-        pred_c = pred[range(B), pred_indices] # [B], FloatTensor
-        # Calculate gradient one by one
-        cams = []
-        for i in range(B):
-            # Reset x gradient
-            x.grad = None
-            # Calculate gradient on ith image
-            pred_c[i].backward(retain_graph=True)
-            gradients = torch.relu(torch.clone(x.grad[i])).unsqueeze(0) # [1, 17, 7, 7]
-            # Use gradient to calculate a cam
-            single_cam = torch.relu(torch.sum(x[i] * gradients, dim=1)[0])
-            cams.append(torch.clone(single_cam / single_cam.max()))
-        cams = torch.stack(cams, dim=0).to(DEVICE).unsqueeze(1) # [B, 1, 7, 7]
-        cams = torch.nn.functional.interpolate(cams, (256, 256), mode="bilinear") # [B, 1, 256, 256]
-        # Use map as red channel, create zeros for green and blue channels.
-        cams = torch.cat((cams, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
         return cams # [B, 3, 256, 256]
 
 
