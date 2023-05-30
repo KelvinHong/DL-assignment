@@ -126,6 +126,41 @@ class baseCAM(nn.Module):
         # Use map as red channel, create zeros for green and blue channels.
         cams = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
         return cams # [B, 3, 256, 256]
+
+    def get_gradient_cam(self, x):
+        # Zero out gradient from the model first
+        for param in self.parameters():
+            param.grad = None
+        # normalize_by can choose "minmax" or "sigmoid"
+        # Return CAMs with values normalized within 0 to 1.
+        B = x.shape[0]
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = self.generate_maps(x) # Output [B, 17, 7, 7]
+        x = x.detach() # To make a leaf node to support gradient calculation.
+        # I imagine detach will also forfeit any gradient before this tensor, which is 
+        # fine by me. 
+        x.requires_grad = True
+        # Get predictions first
+        pred = self.last_dense(self.gap(x)) # [B, 17]
+        pred_indices = torch.argmax(pred, dim=1) # [B], LongTensor
+        pred_c = pred[range(B), pred_indices] # [B], FloatTensor
+        # Calculate gradient one by one
+        cams = []
+        for i in range(B):
+            # Reset x gradient
+            x.grad = None
+            # Calculate gradient on ith image
+            pred_c[i].backward(retain_graph=True)
+            gradients = torch.relu(torch.clone(x.grad[i])).unsqueeze(0) # [1, 17, 7, 7]
+            # Use gradient to calculate a cam
+            single_cam = torch.relu(torch.sum(x[i] * gradients, dim=1)[0])
+            cams.append(torch.clone(single_cam / single_cam.max()))
+        cams = torch.stack(cams, dim=0).to(DEVICE).unsqueeze(1) # [B, 1, 7, 7]
+        cams = torch.nn.functional.interpolate(cams, (256, 256), mode="bilinear") # [B, 1, 256, 256]
+        # Use map as red channel, create zeros for green and blue channels.
+        cams = torch.cat((cams, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
+        return cams # [B, 3, 256, 256]
     
 class ReCAM(baseCAM):
     def __init__(self, normalize_by: str = "minmax"):
@@ -168,9 +203,46 @@ class ReCAM(baseCAM):
         cams = torch.cat((x, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
         return cams # [B, 3, 256, 256]
 
-    
+class SingleLayerCAM(baseCAM):
+    def __init__(self):
+        super(SingleLayerCAM, self).__init__()
 
-    
+    def get_cam(self, x):
+        # Zero out gradient from the model first
+        for param in self.parameters():
+            param.grad = None
+        # normalize_by can choose "minmax" or "sigmoid"
+        # Return CAMs with values normalized within 0 to 1.
+        B = x.shape[0]
+        x = self.features(x)
+        x = self.avgpool(x)
+        x = self.generate_maps(x) # Output [B, 17, 7, 7]
+        x = x.detach() # To make a leaf node to support gradient calculation.
+        # I imagine detach will also forfeit any gradient before this tensor, which is 
+        # fine by me. 
+        x.requires_grad = True
+        # Get predictions first
+        pred = self.last_dense(self.gap(x)) # [B, 17]
+        pred_indices = torch.argmax(pred, dim=1) # [B], LongTensor
+        pred_c = pred[range(B), pred_indices] # [B], FloatTensor
+        # Calculate gradient one by one
+        cams = []
+        for i in range(B):
+            # Reset x gradient
+            x.grad = None
+            # Calculate gradient on ith image
+            pred_c[i].backward(retain_graph=True)
+            gradients = torch.relu(torch.clone(x.grad[i])).unsqueeze(0) # [1, 17, 7, 7]
+            # Use gradient to calculate a cam
+            single_cam = torch.relu(torch.sum(x[i] * gradients, dim=1)[0])
+            cams.append(torch.clone(single_cam / single_cam.max()))
+        cams = torch.stack(cams, dim=0).to(DEVICE).unsqueeze(1) # [B, 1, 7, 7]
+        cams = torch.nn.functional.interpolate(cams, (256, 256), mode="bilinear") # [B, 1, 256, 256]
+        # Use map as red channel, create zeros for green and blue channels.
+        cams = torch.cat((cams, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
+        return cams # [B, 3, 256, 256]
+
+
 def custom_save(model, path):
     """Save CAM model but only with its trainable parameters, 
     its feature extractor counterpart isn't saved.

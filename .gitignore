@@ -6,6 +6,10 @@ model/*
 runs/*
 # Output images
 output/*
+# Batch script
+*.bat
+# Data
+*.rar
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

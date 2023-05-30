@@ -88,7 +88,7 @@ def postprocess(cams):
     return cams
 
 def inference_workflow(model_path, model_type, normalize_by, save_as, seed=-1):
-    if model_type == "CAM":
+    if model_type in ["CAM", "SingleLayerCAM"]:
         model = baseCAM(normalize_by).to(DEVICE)
     elif model_type == "ReCAM":
         model = ReCAM(normalize_by).to(DEVICE)
@@ -106,6 +106,8 @@ def inference_workflow(model_path, model_type, normalize_by, save_as, seed=-1):
         cams = model.get_cam(batch_input)
     elif model_type == "ReCAM":
         cams = model.get_recam(batch_input)
+    elif model_type == "SingleLayerCAM":
+        cams = model.get_gradient_cam(batch_input)
     # Post-process CAMs for better visualization
     cams = postprocess(cams)
     # Convert to pil then overlap heatmaps

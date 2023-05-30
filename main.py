@@ -78,6 +78,9 @@ def CAM_workflow(model_dir: str, **kwargs):
             best_valid_loss = valid_loss
             custom_save(model, os.path.join(model_dir, f"epoch_{epoch}.pth"))
             print(f"Model saved at epoch {epoch}.")
+        if valid_loss > 2 * train_loss:
+            print("Model stopped training as reaching overfitting: Valid_loss is more than twice of training loss.")
+            break
     writer.close()
 
 def ReCAM_workflow(model_dir: str, **kwargs):
@@ -112,11 +115,14 @@ def ReCAM_workflow(model_dir: str, **kwargs):
             best_valid_loss = valid_loss
             custom_save(model, os.path.join(model_dir, f"epoch_{epoch}.pth"))
             print(f"Model saved at epoch {epoch}.")
+        if valid_loss > 2 * train_loss:
+            print("Model stopped training as reaching overfitting: Valid_loss is more than twice of training loss.")
+            break
     writer.close()
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m", "--model-type", help="Choose from 'CAM' or 'ReCAM'", type=str)
+    parser.add_argument("-m", "--model-type", help="Choose from 'CAM', 'ReCAM' or 'SingleLayerCAM", type=str)
     parser.add_argument("-n", "--normalize-by", help="Choose from 'minmax', 'sigmoid' or 'relu', defaults to 'minmax'.", type=str, default='minmax')
     parser.add_argument("-l", "--lr", help="Learning rate, defaults to 1e-4.", default=1e-4, type=float)
     parser.add_argument("-e", "--epochs", help="Number of epochs, defaults to 50.", default=50, type=int)
