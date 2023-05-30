@@ -238,7 +238,8 @@ class baseCAM(nn.Module):
         std_s4 = torch.nn.functional.interpolate(cams_s4, (256, 256), mode="bilinear") # [B, 1, 256, 256]
         std_s5 = torch.nn.functional.interpolate(cams_s5, (256, 256), mode="bilinear") # [B, 1, 256, 256]
 
-        final_cams = (std_s3 + std_s4 + std_s5) / 3
+        final_cams = (2*std_s3+2*std_s4+std_s5)/5 # Weighting
+        final_cams = torch.tanh(2*final_cams) # Follow Formula 9 from https://mftp.mmcheng.net/Papers/21TIP_LayerCAM.pdf
         # Use map as red channel, create zeros for green and blue channels.
         cams = torch.cat((final_cams, torch.zeros(B, 2, 256, 256).to(DEVICE)), dim=1)
         return cams # [B, 3, 256, 256]
