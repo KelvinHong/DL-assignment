@@ -2,7 +2,6 @@
 # AKA offline data augmentation.
 # Make sure you have data/jpg/ folder available. 
 import os
-import torch
 import torchvision
 from tqdm import tqdm 
 from torchvision import transforms
