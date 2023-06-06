@@ -89,14 +89,24 @@ def postprocess(cams):
     cams = torch.clamp(1.5*cams, max=1)
     return cams
 
+def save_as_compact(batched_tensors, save_as):
+    """Save tensors into a single image without any labels.
+
+    Args:
+        batched_tensors (torch tensor): A torch tensor with shape [B, C, H, W]
+        save_as (str): Save as path.
+    """
+    img = torchvision.utils.make_grid(batched_tensors, nrow=4)
+    torchvision.utils.save_image(img, save_as)
+
 def inference_workflow(model_path, model_type, normalize_by, save_as, image_title, seed=-1):
     if model_type in ["CAM", "SingleLayerCAM", "LayerCAM"]:
         model = baseCAM(normalize_by).to(DEVICE)
     elif model_type == "ReCAM":
         model = ReCAM(normalize_by).to(DEVICE)
-    model = partial_load_state_dict(model, args.model_path).to(DEVICE)
+    model = partial_load_state_dict(model, model_path).to(DEVICE)
     model.eval()
-    batch_input, batch_label = get_random_batch(valid_dataset, seed=args.seed)
+    batch_input, batch_label = get_random_batch(valid_dataset, seed=seed)
     B = batch_input.shape[0]
     batch_input = batch_input.to(DEVICE)
     predictions = model(batch_input)
@@ -127,7 +137,7 @@ def inference_workflow(model_path, model_type, normalize_by, save_as, image_titl
         overlapped.append(torch.clone(res))
     overlapped = torch.stack(overlapped)
     save_as_grids(overlapped, info, image_title, save_as)
-    save_as_compact(overlapped, save_as) 
+    save_as_compact(overlapped, save_as.replace(".jpg", "_compact.jpg")) 
     print(f"Model inference result saved as [{os.path.abspath(save_as)}].")
 
 if __name__ == "__main__":
