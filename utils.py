@@ -184,18 +184,6 @@ class baseCAM(nn.Module):
         s5 = self.avgpool(s5)
         s5 = self.generate_maps(s5) # Output [B, 17, 7, 7]
         s5.retain_grad()
-        # s5 = s5.detach() # To make a leaf node to support gradient calculation.
-        # I imagine detach will also forfeit any gradient before this tensor, which is 
-        # fine by me. 
-        # s1 = s1.detach()
-        # s2 = s2.detach()
-        # s3 = s3.detach()
-        # s4 = s4.detach()
-        # s1.requires_grad = True
-        # s2.requires_grad = True
-        # s3.requires_grad = True
-        # s4.requires_grad = True
-        # s5.requires_grad = True
 
 
         # print(s1.shape, s2.shape, s3.shape, s4.shape, s5.shape)

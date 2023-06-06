@@ -58,12 +58,13 @@ def create_comparison(gts, predictions):
     result["loss"] = loss
     return result
 
-def save_as_grids(batched_tensors, info, save_as):
+def save_as_grids(batched_tensors, info, image_title, save_as):
     """Save tensors into a single image.
 
     Args:
         batched_tensors (torch tensor): A torch tensor with shape [B, C, H, W]
         labels (list or torch tensor): Labels with shape [B].
+        image_title (str): plot title.
         save_as (str): Save as path.
     """
     batched_tensors = batched_tensors.detach().cpu().numpy().transpose((0,2,3,1))
@@ -73,8 +74,9 @@ def save_as_grids(batched_tensors, info, save_as):
                     right=0.9,
                     top=0.9,
                     wspace=0.4,
-                    hspace=0.4)
-    fig.suptitle(f"Loss evaluated as {info['loss']:.4f}", fontsize=16)
+                    hspace=0)
+    # fig.suptitle(f"Loss evaluated as {info['loss']:.4f}", fontsize=16)
+    fig.suptitle(image_title, fontsize=16)
     for ind in range(NROW*NCOL):
         ax = plt.subplot(NROW, NCOL, ind+1)
         ax.set_title(info["captions"][ind], size=10)
@@ -87,7 +89,7 @@ def postprocess(cams):
     cams = torch.clamp(1.5*cams, max=1)
     return cams
 
-def inference_workflow(model_path, model_type, normalize_by, save_as, seed=-1):
+def inference_workflow(model_path, model_type, normalize_by, save_as, image_title, seed=-1):
     if model_type in ["CAM", "SingleLayerCAM", "LayerCAM"]:
         model = baseCAM(normalize_by).to(DEVICE)
     elif model_type == "ReCAM":
@@ -124,7 +126,8 @@ def inference_workflow(model_path, model_type, normalize_by, save_as, seed=-1):
         res = transforms.ToTensor()(res)
         overlapped.append(torch.clone(res))
     overlapped = torch.stack(overlapped)
-    save_as_grids(overlapped, info, save_as)
+    save_as_grids(overlapped, info, image_title, save_as)
+    save_as_compact(overlapped, save_as) 
     print(f"Model inference result saved as [{os.path.abspath(save_as)}].")
 
 if __name__ == "__main__":
@@ -141,8 +144,13 @@ if __name__ == "__main__":
     d = FlowerDataset()
     strain, stest, sval = load_splits(split=1)
     valid_dataset = Subset(d, sval)
+    # Set image title
+    image_title = f"[{args.model_type}] Model"
+    if args.model_type != "LayerCAM":
+        # Specify normalizing method for non-LayerCAM model
+        image_title += f", normalized by [{args.normalize_by}]"
     # Start
-    inference_workflow(args.model_path, args.model_type, normalize_by = args.normalize_by, save_as = image_output, seed = args.seed)
+    inference_workflow(args.model_path, args.model_type, normalize_by = args.normalize_by, save_as = image_output, image_title = image_title, seed = args.seed)
     
 
     

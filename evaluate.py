@@ -81,7 +81,7 @@ def evaluate(model):
         accuracies["top1"] += int(top1.item() * B)
         accuracies["top3"] += int(top3.item() * B)
         accuracies["top5"] += int(top5.item() * B)
-    accuracies = {key: value/total_data for key, value in accuracies.items()}
+    accuracies = {key: round(value/total_data, 4) for key, value in accuracies.items()}
     return accuracies
 
 if __name__ == "__main__":
