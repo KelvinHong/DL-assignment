@@ -89,14 +89,14 @@ def postprocess(cams):
     cams = torch.clamp(1.5*cams, max=1)
     return cams
 
-def save_as_compact(batched_tensors, save_as):
+def save_as_compact(batched_tensors, save_as, nrow=4):
     """Save tensors into a single image without any labels.
 
     Args:
         batched_tensors (torch tensor): A torch tensor with shape [B, C, H, W]
         save_as (str): Save as path.
     """
-    img = torchvision.utils.make_grid(batched_tensors, nrow=4)
+    img = torchvision.utils.make_grid(batched_tensors, nrow=nrow)
     torchvision.utils.save_image(img, save_as)
 
 def inference_workflow(model_path, model_type, normalize_by, save_as, image_title, seed=-1):
@@ -138,6 +138,7 @@ def inference_workflow(model_path, model_type, normalize_by, save_as, image_titl
     overlapped = torch.stack(overlapped)
     save_as_grids(overlapped, info, image_title, save_as)
     save_as_compact(overlapped, save_as.replace(".jpg", "_compact.jpg")) 
+    save_as_compact(overlapped, save_as.replace(".jpg", "_strip.jpg"), nrow=1) 
     print(f"Model inference result saved as [{os.path.abspath(save_as)}].")
 
 if __name__ == "__main__":
