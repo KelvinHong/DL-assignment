@@ -122,7 +122,7 @@ def ReCAM_workflow(model_dir: str, **kwargs):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-m", "--model-type", help="Choose from 'CAM', 'ReCAM' or 'SingleLayerCAM", type=str)
+    parser.add_argument("-m", "--model-type", help="Choose from 'CAM', 'ReCAM' or 'LayerCAM", type=str)
     parser.add_argument("-n", "--normalize-by", help="Choose from 'minmax', 'sigmoid' or 'relu', defaults to 'minmax'.", type=str, default='minmax')
     parser.add_argument("-l", "--lr", help="Learning rate, defaults to 1e-4.", default=1e-4, type=float)
     parser.add_argument("-e", "--epochs", help="Number of epochs, defaults to 50.", default=50, type=int)
