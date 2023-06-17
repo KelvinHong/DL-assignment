@@ -32,8 +32,6 @@ tar.close()
 os.remove(target_path)
 
 # Download models
-import gdown
-
 url = 'https://drive.google.com/uc?id=1Trr1q4FzWSNfeVq47RhudJC_lLlxL8J9'
 model_rarpath = './models.rar'
 gdown.download(url, model_rarpath, quiet=False)
