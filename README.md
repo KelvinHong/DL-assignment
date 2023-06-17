@@ -12,4 +12,5 @@ of python.
 
 ## Steps to use this repository. 
 
-Run `python prepare.py` to download dataset 
+Run `python prepare.py` to download dataset, splits and models. 
+Decompress the `./models.rar` file.

@@ -31,6 +31,7 @@ def augment(img_path):
         torchvision.utils.save_image(auged_img,targets[i])
 
 if __name__ == "__main__":
+    print("Performing offline image augmentation.")
     img_paths = [os.path.join("./data/jpg/", p) for p in os.listdir("./data/jpg/") if p.endswith(".jpg")]
     
     for path in tqdm(img_paths):
