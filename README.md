@@ -35,3 +35,7 @@ pip install -r requirements.txt
 Run `python prepare.py` to download dataset, splits and models. 
 Decompress pretrained models from `./models.rar` so that `/model/` 
 appear. 
+
+## Results
+
+![Comparison of three models](./media/compare_98.png)

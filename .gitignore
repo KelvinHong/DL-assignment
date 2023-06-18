@@ -10,6 +10,7 @@ output/*
 *.bat
 # Data
 *.rar
+.vscode/*
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
