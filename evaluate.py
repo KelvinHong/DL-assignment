@@ -89,9 +89,7 @@ if __name__ == "__main__":
     parser.add_argument("-d", "--model-dir", type=str)
     # Model type will be inferred by training logs
     args = parser.parse_args()
-
     model_dir = args.model_dir
-
     # Infer model type
     model = None
     with open(os.path.join(model_dir, "training_logs.txt"), "r") as f:
@@ -108,10 +106,8 @@ if __name__ == "__main__":
                 model = ReCAM("minmax")
     model.eval()
     model.to(DEVICE)
-
     # Initialize json file
     eval_out = os.path.join(model_dir, "eval.json")
-    
     # Start evaluating
     evals = {}
     for ind in range(100):

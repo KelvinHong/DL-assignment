@@ -118,8 +118,8 @@ def inference_workflow(model_path, model_type, normalize_by, save_as, image_titl
         cams = model.get_cam(batch_input)
     elif model_type == "ReCAM":
         cams = model.get_recam(batch_input)
-    elif model_type == "SingleLayerCAM":
-        cams = model.get_gradient_cam(batch_input)
+    # elif model_type == "SingleLayerCAM":
+    #     cams = model.get_gradient_cam(batch_input)
     elif model_type == "LayerCAM":
         cams = model.get_detail_cam(batch_input)
     # Post-process CAMs for better visualization
@@ -161,7 +161,9 @@ if __name__ == "__main__":
         # Specify normalizing method for non-LayerCAM model
         image_title += f", normalized by [{args.normalize_by}]"
     # Start
-    inference_workflow(args.model_path, args.model_type, normalize_by = args.normalize_by, save_as = image_output, image_title = image_title, seed = args.seed)
+    inference_workflow(args.model_path, args.model_type, 
+            normalize_by = args.normalize_by, save_as = image_output, 
+            image_title = image_title, seed = args.seed)
     
 
     

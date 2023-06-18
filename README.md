@@ -8,7 +8,8 @@ the inner working of an image classifier.
 ## Pre-requisite
 
 This program is tested on Python 3.9.0, but should work on later version
-of python. 
+of python. It is also recommended to run this in a device with GPU as
+it is not tested on a CPU-only machine.
 
 If you do not have virtual environment module, install it by
 ```
