@@ -39,9 +39,24 @@ pip install -r requirements.txt
 
 ## Steps to use this repository. 
 
+(Must do)
+
 Run `python prepare.py` to download dataset, splits and models. 
+
 Decompress pretrained models from `./models.rar` so that `/model/` 
 appear. 
+
+Perform data augmentation by running `python augment.py`.
+
+
+(Optional)
+
+To train a model, use `main.py` (need to understand flags)
+
+To inference, use `inference.py` (need to understand flags)
+
+To evaluate (accuracies), use `evaluate.py` (need to understand flags)
+
 
 ## Results
 
