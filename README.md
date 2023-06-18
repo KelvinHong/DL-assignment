@@ -25,6 +25,13 @@ Windows 10)
 ./venv/Scripts/activate
 ```
 
+Install `torch` and `torchvision` (with GPU recommended)
+from the official pytorch website. 
+GPU example: 
+```
+pip install torch torchvision --index-url https://download.pytorch.org/whl/cu117
+```
+
 Install requirements by running
 ```
 pip install -r requirements.txt
