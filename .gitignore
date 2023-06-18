@@ -6,8 +6,6 @@ model/*
 runs/*
 # Output images
 output/*
-# Batch script
-*.bat
 # Data
 *.rar
 .vscode/*
